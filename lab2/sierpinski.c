@@ -1,15 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* -------------------------------------------------------------------------- */
-/* Grids and Points (Questions 5-10)                                          */
-/* -------------------------------------------------------------------------- */
 
-// Configured for final dimensions (Question 21)
 int nb_columns() { 
     return 129; 
 }
-
 int nb_lines() { 
     return 65; 
 }
@@ -36,14 +31,10 @@ void plot_point(char grid[], int x, int y, char pixel) {
         printf("Error: Coordinates (%d, %d) are out of bounds.\n", x, y);
         exit(EXIT_FAILURE);
     }
-    // Bottom-left origin projection: row is nb_lines() - y - 1
     int row = nb_lines() - y - 1;
     grid[row * nb_columns() + x] = pixel;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Sorting (Questions 1-4)                                                    */
-/* -------------------------------------------------------------------------- */
 
 int sort_get_index(float tab[], int top, float val) {
     for (int i = 0; i < top; i++) {
@@ -66,15 +57,11 @@ void sort_insert(float tab[], int top, float val) {
     sort_insert_at(tab, i, top, val);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Vertical Lines (Questions 11-13)                                           */
-/* -------------------------------------------------------------------------- */
 
 void plot_vline(char grid[], int x, float fy0, float fy1, char pixel) {
     int y0 = (int)(fy0 + 0.5);
     int y1 = (int)(fy1 + 0.5);
 
-    // Rounding adjustment for exact .5 values (Question 13)
     if (fy0 == (float)y0 - 0.5) {
         y0--;
     }
@@ -84,9 +71,6 @@ void plot_vline(char grid[], int x, float fy0, float fy1, char pixel) {
     }
 }
 
-/* -------------------------------------------------------------------------- */
-/* Beautiful Polygons (Questions 14-20)                                       */
-/* -------------------------------------------------------------------------- */
 
 struct point {
     float x;
@@ -100,7 +84,6 @@ void plot_poly_sweep(char grid[], struct point p[], int n, int x, char pixel) {
     for (int i = 0; i < n; i++) {
         int j = (i == 0) ? n - 1 : i - 1;
 
-        // Q20 (Optional): Handle corners and vertical borders precisely
         if ((int)p[i].x == x) {
             if ((int)p[j].x == x) {
                 float min_y = p[i].y < p[j].y ? p[i].y : p[j].y;
@@ -111,7 +94,6 @@ void plot_poly_sweep(char grid[], struct point p[], int n, int x, char pixel) {
             }
         }
 
-        // Q19 & Q16: Compute and append plane intersections
         if (p[i].x <= p[j].x) {
             if (p[i].x <= x && x < p[j].x) {
                 float inter = p[i].y + (x - p[i].x) * (p[j].y - p[i].y) / (p[j].x - p[i].x);
@@ -127,7 +109,6 @@ void plot_poly_sweep(char grid[], struct point p[], int n, int x, char pixel) {
         }
     }
 
-    // Q18: Draw paired intersections
     for (int k = 0; k < top; k += 2) {
         if (k + 1 < top) {
             plot_vline(grid, x, vlines[k], vlines[k + 1], pixel);
@@ -141,9 +122,6 @@ void plot_poly(char grid[], struct point p[], int n, char pixel) {
     }
 }
 
-/* -------------------------------------------------------------------------- */
-/* The Triangle (Questions 21-23)                                             */
-/* -------------------------------------------------------------------------- */
 
 void plot_triangle(char grid[], struct point p1, struct point p2, struct point p3, char pixel) {
     struct point p[3] = {p1, p2, p3};
@@ -171,9 +149,6 @@ void sierpinski(char grid[], struct point p1, struct point p2, struct point p3, 
     }
 }
 
-/* -------------------------------------------------------------------------- */
-/* Main Execution                                                             */
-/* -------------------------------------------------------------------------- */
 
 int main(int argc, char* argv[]) {
     int size = nb_lines() * nb_columns();
