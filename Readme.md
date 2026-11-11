@@ -1,207 +1,502 @@
-# My vacation in Bilbao
+# Abstract Syntax Tree
 
-The objective of this exercise is to familiarize you with your first objects and constructors. The exercise also introduces you graphs by implementing a simple version of the A* algorithm, which efficiently finds a path between two cities (technically, a path between two nodes in a weighted graph).
+The objective of this exercise is to familiarize you with inheritance.
 
-In this exercise, we implement a small navigation application that allows you to travel by car. This application enables you to calculate an efficient route from one city to another using the A* (pronounce A star) algorithm. For this, you will need to work with weighted graphs. A graph is a mathematical structure where nodes are connected by edges that carry a weight. In our case, the nodes represent cities, the edges symbolize roads, and the weight of an edge represents the distance to travel on the road.
+In this lab, we will design an interpreter for a lisp language. Lisp was created in the fifties and is the second oldest language of the world. Lisp is based on lists (lisp is an abbreviation for list processing). That means that, in lisp, a complex expression is represented by a list, where the first element of the list is an operation. When lisp evaluates a list, we say that it `applies` the operation to the list.
 
-> **Note:**  
-> This lab is the most complex lab of the course. The complexity arises from the complexity of the A* algorithm and from the complexity of the data structures used to implement the algorithm. Since this lab is more complex than the others, you have two weeks to finish it instead of one. Do you best to finish the lab: you will learn a lot and start to really master the C and C++ programming languages.
+In lisp, an expression is written in a fully parenthesized prefix notation. For example, to represent the addition between the integers 1 and 2, we write `(+ 1 2)`. Evaluating this expression means that we apply the operation `+` on the list `(+ 1 2)`. An expression can be more complex. For example, `(* 4 (+ 1 2))` represents the multiplication between the evaluation of `4` and the evaluation of `(+ 1 2)`.
 
-## Preparation
+In our lab, we will represent an expression with a tree called an abstract syntax tree (AST). For example, we will represent the expression `(* 4 (+ 1 2))` with this abstract tree:
 
-### Question 1
+```text
+   ( )
+ /  |  \
+*   4   ( )
+       / | \
+      +  1  2
+```
 
-In your `csc_2f001_ep` repository, create a new directory called `lab4`. In this directory, creates a `main.cpp` file, which uses `std::cout` to print `Hello world!!!` in the terminal. Create a `Makefile` that compiles `main.cpp` into the `bilbao` binary. Your `Makefile` has to generate first the intermediate object files, and then to generate the binary. For that, you can start from the `Makefile` that you wrote in lab 3.
+In the figure, `( )` represents a list, and its leaves give its elements. The list at the top contains three elements: the keyword `*`, the integer `4` and a sub-list. The sub-list contains also three elements: the keyword `+` and the integers `1` and `2`.
+
+In order to build this tree, we consider four types of nodes:
+
+* `node_t` is a generic node. All the other types of nodes inherit from `node_t`,
+* `keyword_t` is a node that represents an operation,
+* `integer_t` is a node that represents an integer,
+* `list_t` is a node that represents a list.
+
+A generic `node_t` has three main methods:
+
+* `node_t* eval()` evaluates a node and returns the result of the evaluation,
+* `node_t* apply(list_t* list)` applies an operation to the list,
+* `std::string to_string()` converts a node into a string in order to print it.
+
+In order to evaluate the abstract syntax tree `(* 4 (+ 1 2))`, the interpreter call the `eval()` method of `list_t`:
+
+* The `eval()` method of `list_t` starts by evaluating the first element of the list `(* 4 (+ 1 2))` with `eval()`. Evaluating a keyword returns the keyword, which means that evaluating the keyword `*` returns the keyword `*`. Evaluating the first element looks useless because, for the moment, we only consider a list that starts with a keyword. However, in the exercise, you will see that we can replace the first element itself by a more complex expression.
+* The `eval()` method of `list_t` then calls the `apply()` method of `*` in order to apply `*` to `(* 4 (+ 1 2))`.
+* The apply method of `*`, starts by evaluating the operands:
+  * The evaluation of an integer simply returns the integer, which means that the evaluation of `4` returns `4`.
+  * The evaluation of the list `(+ 1 2)` restarts the same process:
+    * The `eval()` method of the list evaluates the first element of the list, which returns the keyword `+`,
+    * The `eval()` method of the list then applies `+` to `(+ 1 2)` by calling the `apply()` method of `+`.
+    * The `apply()` method of `+` applied to `(+ 1 2)` evaluates the operands, which returns the integers `1` and `2`. Then, the `apply()` method computes the sum of the intermediate results and returns the integer `3`.
+* Finally, the apply method of `*` multiplies the result of the evaluation of the operands: it computes `4 * 3 = 12` and returns that integer.
 
 > **Warning:**  
-> Add the option `-std=c++20` when you compile a file with `g++`. This option instructs `g++` to use the `c++20` standard and not an older one because in this course, we rely on this standard. In the next labs, don't forget to add this option when you compile a C++ source file.
+> In this lab, freeing memory is difficult. For this reason, in this exercise, you don't have to implement any destructors, and you don't have to call `delete`. The memory that you will allocate is wasted during a run, but don't worry, your operating system frees it when your process ends.
+> 
+> Actually, managing memory in our small interpreter is the very reason why garbage collectors were proposed. Technically, the first garbage collector was proposed to automatically manage the memory of an interpreter for the lisp language. If you want to know more about this first garbage collector, you can read this paper: McCarthy, John (1960). "Recursive functions of symbolic expressions and their computation by machine, Part I". Communications of the ACM. 3 (4): 184–195.
 
-### Question 2
+---
 
-Add the files `main.cpp` and `Makefile` to your repository. Commit the changes and push them on `gitlab`. In the remainder of the lab, when you create a new source file, don't forget to add it to the repository.
+## Mandatory part
 
-## The cities and the roads
+## Nodes and integers
 
-In this exercise, you will design a structure named `location_t`, which represents a city. A city consists of:
-
-* a name (an `std::string`),
-* a latitude and a longitude (two `doubles`),
-* an array of neighbors (a pointer to an array that contains `location_t*` elements),
-* the number of neighbors (a `size_t`).
+We start our journey by implementing the `node_t` and the `integer_t` structures.
 
 ### Question 1
 
-Write a structure `location_t` in a file `location.h`. The structure has a constructor that takes as argument the name, the latitude and the longitude of the city. Write also the implementation of the constructor in a file `location.cpp`. In the main function, copy the following code that creates some cities:
+Implement the `node_t` structure. A `node_t` does not have any field. It also does not have constructors. It only provides the following methods:
+
+* `virtual node_t* eval()`: by default, in `node_t`, `eval()` simply returns `this`, which is a correct behavior if the node is a keyword or a interger.
+* `virtual node_t* apply(list_t* list)`: by default, in `node_t`, `apply` reports an error and quit the process (see below), which is a correct behavior if the node is an integer or a list. Note that you have to pre-declare the structure `list_t` before the definition of `node_t` in order to use the `list_t` type when you define the `apply` method in `node_t`.
+* `virtual std::string to_string()`: since we don't have a satisfactory way of converting a generic node into a string, this method returns the string `???`
+* `virtual list_t* as_list()`: this method convert the node into a list and will be useful in the next exercises. Since a node is not necessary a list, this function reports an error and quits.
+
+In order to report an error and quit in `apply`, copy-paste this code:
 
 ```cpp
-  location_t palaiseau { "Palaiseau", 0.850219, 0.0386527 };
-  location_t paris { "Paris", 0.852709, 0.041054 };
-  location_t strasbourg { "Strasbourg", 0.837758, 0.122173 };
-  location_t reims { "Reims", 0.855211, 0.069813 };
-  location_t dijon { "Dijon", 0.820304, 0.087266 };
-  location_t lemans { "Le Mans", 0.837865, 0.00348291 };
-  location_t orleans { "Orléans", 0.836064, 0.0333227 };
-  location_t angers { "Angers", 0.828655, -0.0098291 };
-  location_t tours { "Tours", 0.827184, 0.0119527 };
-  location_t bourges { "Bourges", 0.821719, 0.0418666 };
-  location_t poitiers { "Poitiers", 0.812978, 0.00594066 };
-  location_t limoges { "Limoges", 0.799948, 0.0220104 };
-  location_t angouleme { "Angouleme", 0.796714, 0.00272685 };
-  location_t bordeaux { "Bordeaux", 0.782567, -0.0101086 };
-  location_t agen { "Agen", 0.77149, 0.0107576 };
-  location_t toulouse { "Toulouse", 0.761045, 0.0252062 };
-  location_t bayonne { "Bayonne", 0.759095, -0.0257408 };
-  location_t pau { "Pau", 0.755642, -0.00647163 };
-  location_t sansebastian { "San Sebastian", 0.756048, -0.034579 };
-  location_t pampelune { "Pampelune", 0.74722, -0.0287242 };
-  location_t bilbao { "Bilbao", 0.755082, -0.0512252 };
+void error(std::string str) __attribute__((noreturn));
+
+void error(std::string str) {
+  std::cout << "Error: " << str << std::endl;
+  exit(1);
+}
 ```
+
+The first line declare that `error` is a function that does not return. Thanks to that, the compiler will consider that not returning a `node_t*` in `apply` after having called `error` is correct. In the remainder of the lab, when you have to report an error, use this `error` function.
+
+### Question 2
+
+We can now implement the `integer_t` structure. This structure inherits from `node_t`. An integer has a single field: an integer with the type `uintptr_t` that gives the value of the integer. The type `uintptr_t` is a type that represents a machine word, which means 64 bits on current machines.
+
+The `integer_t` structure has also a constructor that initializes the value, and its `to_string()` method returns a string that represents the value. For that, you can use the function `std::string std::to_string(int v)`, which builds a string from an integer. Since, in `node_t`, the behavior of `eval()` and `apply()` is already correct for a `integer_t`, you don't have to override these methods.
+
+In main, you can now allocate an integer, evaluate it and print the result. For example, the following code should produce `3 => 3`.
+
+```cpp
+node_t* ast = new integer_t { 3 };
+std::cout << ast->to_string() << " => " << ast->eval()->to_string() << std::endl;
+```
+
+🎉 **Congratulations! You have just built your first abstract syntax tree! This tree is not very impressive, but all the mechanics to execute an expression are already in place.**
+
+## List
+
+We will now start the implementation of the `list_t` structure. This structure is fundamentally an extensible array of `node_t*`, not so far from the army of monsters.
+
+### Question 1
+
+Implement a `list_t` structure. At this step, the structure contains three fields:
+
+* `node_t** elements` points to an array, in which each element is a pointer to a node,
+* `size_t nb_elements` gives the number of elements in the array.
+* `size_t capacity` gives the total capacity of the array.
+
+Additionally to the fields, add an empty constructor, i.e., a constructor that does not take arguments. The constructor has to initialize `elements` to `nullptr`, and `nb_elements` and `capacity` to 0.
+
+### Question 2
+
+We can now add five basic functions:
+
+* `list_t* as_list()` returns the list.
+* `size_t size()` returns `nb_elements`.
+* `node_t* at(size_t i)` returns the element at the index `i`. If `i` is higher than `nb_elements`, the method uses the `error` function to report an error.
+* `void set_at(size_t i, node_t* value)` sets `value` at the index `i`. If `i` is higher than `nb_elements`, the method uses the `error` function to report an error.
+* `void append(node_t* value)` appends a new element to the array. If `nb_elements` is equal to `capacity`, the method extends its capacity by allocating a new array and copying the old one into the new one.
+* `std::string to_string()` returns a string that represents the list with a fully parenthesized notation. For example, printing the list that contains the integer 1, 2 and 3 should return the string `(1 2 3)`.
+
+At this step, if your code is correct, you should already be able to create and print a first list in `main`, for example with the following code in main:
+
+```cpp
+list_t* ast = new list_t;
+
+ast->append(new integer_t { 1 });
+ast->append(new integer_t { 2 });
+ast->append(new integer_t { 3 });
+
+std::cout << ast->to_string() << std::endl; // should output (1 2 3)
+```
+
+## Keywords
+
+It's now time to create keywords.
+
+### Question 1
+
+We will first implement the `keyword_t` structure. This structure represents a generic keyword. We will implement a concrete keyword by inheriting from `keyword_t`. Implement the `keyword_t` structure. This data structure contains:
+
+* an identifier `std::string id`, which identifies the keyword. The identifier will be useful when we will print complex trees,
+* a constructor able to initialize this identifier,
+* a `to_string()` method that returns the identifier surrounded by `<` and `>`. Surrounding the keyword with `<` and `>` will become useful later when we will introduce symbols in order to avoid mixing up a keyword with a symbol.
+
+### Question 2
+
+Write now a `add_t` structure that inherits `keyword_t`. For the moment, `add_t` has only to define a constructor without argument. This constructor uses the parent's constructor to initialize the identifier of the keyword to the string `+`. You can now build you first abstract tree by copying this code in `main`:
+
+```cpp
+node_t* add = new add_t;
+list_t* ast = new list_t;
+
+ast->append(add);
+ast->append(new list_t);
+ast->at(1)->as_list()->append(add);
+ast->at(1)->as_list()->append(new integer_t { 1 });
+ast->at(1)->as_list()->append(new integer_t { 2 });
+ast->append(new integer_t { 3 });
+
+std::cout << ast->to_string() << " => " << ast->eval()->to_string() << std::endl;
+// should output (<+> (<+> 1 2) 3)
+```
+
+🎉 **Congratulations! You can now build abstract syntax trees! You cannot yet interpret them, but at least, when you print them, the result is pretty.**
+
+## Abstract syntax tree interpreter
+
+We will now bring our interpreter to life. For that, we will implement the missing `eval` and `apply` methods.
+
+### Question 1
+
+Instead of simply printing the abstract syntax tree of `(+ (+ 1 2) 3)`, try to evaluate it with:
+
+```cpp
+std::cout << ast->to_string() << " => " << ast->eval()->to_string() << std::endl;
+```
+
+Why your program outputs `(<+> (<+> 1 2) 3) => (<+> (<+> 1 2) 3)`?
+
+### Question 2
+
+We now implement the `node_t* eval()` function of `list_t`. As explained in the preamble of the lab, this function has to:
+
+* Evaluate the first element of the list,
+* call the apply method on the result of this evaluation.
+
+Why, now, your program ends with an error?
+
+### Question 3
+
+As a last step, you have now to implement the `apply` method of `add_t`. For that, you have to evaluate the elements of the list by starting from the second one, and to sum up the results of these evaluations. However, since the result of an evaluation is a `node_t`, you cannot use it as a `integer_t`. Directly downcasting the result into a `integer_t` is not a good design choice since the result is not necessarily a `node_t`. For this reason, we will rely on inheritance to downcast the result. In details:
+
+* Add `virtual uintptr_t int_value()` method in `node_t` that ends with an error explaining that the node is not an integer,
+* Override `uintptr_t int_value()` in `integer_t` to return the value of the integer.
+
+Now, you can convert the result of an evaluation to an integer, for example with `at(i)->eval()->int_value()`. After having implemented the `apply` method, your program should output `(<+> (<+> 1 2) 3) => 6`.
+
+🎉 **Congratulations! You have now a beautiful abstract syntax tree interpreter!**
+
+## Call frames and symbols
+
+A language able to add values is funny, but somehow limited. For this reason, we will introduce a notion of variable. For that, we need call frames and symbols.
+
+### Question 1
+
+As a first step, we will create a new type of node: the `symbol_t` structure. The `symbol_t` structure inherits from `node_t` and has a single field: a `std::string` called `id`. Implement `symbol_t` with:
+
+* A constructor that initializes `id`,
+* A `bool is(std::string id)` method that returns true if `this->id` is equal to `id`.
+* A `std::string to_string()` that returns `id`.
+
+The method `bool is(std::string id)` will be called on any type of nodes later. For this reason, add also a `virtual bool is(std::string id)` method in `node_t` that returns false.
+
+### Question 2
+
+We will now design a call frame. In order to minimize our work, we will represents a call frame as a list, where each element of the list associates a symbol to node. In other words, a call frame is a list, where each element is a list with two elements: a symbol and a node. For example, if `frame` is a call frame, `frame->at(2)->as_list()->at(0)` gives the symbol of the second variable, and `frame->at(2)->as_list()->at(1)` gives its value.
+
+To achieve this goal, implement a new structure called `frame_t` that inherits from `list_t` without adding fields. The `frame_t` structure implements two methods:
+
+* `void set(node_t* sym, node_t* value)` finds the symbol `sym` in the list and updates its value. If the symbol does not yet exist, the method creates it.
+* `node_t* get(node_t* sym)` returns the value associated to the symbol `sym`. If the symbol does not exist, the method reports an error.
+
+You can observe that a symbol is considered as a `node_t*` in `get` and `set`. This is on purpose to simplify the code of the next questions. In order to know if an element is a list, you can leverage the `bool is(std::string id)` and the `std::string to_string()` method, for example with:
+
+```cpp
+if(sym->is(at(i)->as_list()->at(0)->to_string())) { ... }
+```
+
+To verify that your code is correct, copy-paste this code in `main`:
+
+```cpp
+frame_t* frame = new frame_t;
+
+frame->set(new symbol_t { "a" }, new integer_t { 666 });
+frame->set(new symbol_t { "b" }, new integer_t { 21 });
+frame->set(new symbol_t { "a" }, new integer_t { 42 });
+
+std::cout << frame->to_string() << ": a=" << frame->get(new symbol_t { "a" })->to_string() << std::endl;
+```
+
+If your code is correct, your test should output `((a 42) (b 21)): a=42`.
+
+### Question 3
+
+As a last step, we have to be able to convert a symbol into its value when we evaluate a symbol. The problem is that an evaluate function does not have access to the frame. For this reason, you have to add a `frame_t* frame` argument to the `eval()` methods and to the `apply(list_t* list)`. Moreover, you have pass this `frame_t*` argument step by step, from the eval methods to the apply methods, and then back from the apply methods to the eval methods.
+
+At this question, we only focus on passing this `frame_t*` argument step by step. For that, first, add a `frame_t*` parameters in all the `eval()` (i.e., transform each `node_t* eval()` into a `node_t* eval(frame_t* frame)`). Then, add a `frame_t*` parameters in all the `apply(list_t* list)` (i.e., transform each `node_t* apply(list_t* list)` into a `node_t* apply(list_t* list, frame_t* frame)`). Finally, modify each call to `eval` or `apply` in order to pass step by step this `frame_t*` argument. For that, you can rely on the compiler, which will complain if a `frame_t*` argument is missing.
+
+### Question 4
+
+Now, implement the `node_t* eval(frame_t* frame)` method of `symbol_t`. This function has to return the value associated to the symbol in the frame `frame`. If your code is correct, the following code should print `(<+> (<+> a 2) 3) => 42`.
+
+```cpp
+node_t* add = new add_t;
+symbol_t* a = new symbol_t { "a" };
+frame_t* frame = new frame_t;
+
+frame->set(a, new integer_t { 37 });
+
+list_t* ast = new list_t;
+
+ast->append(add);
+ast->append(new list_t);
+ast->at(1)->as_list()->append(add);
+ast->at(1)->as_list()->append(a);
+ast->at(1)->as_list()->append(new integer_t { 2 });
+ast->append(new integer_t { 3 });
+
+std::cout << ast->to_string() << " => " << ast->eval(frame)->to_string() << std::endl;
+```
+
+## The set! keyword
+
+For the last exercise of the mandatory part, you will implement a `set!` keyword. This keyword stores a value into a variable. For example, the expression `(set! a (+ 1 2))` stores the integer 3 into the variable `a`. In order to achieve that goal, the `set!` keyword has use `frame->set()` to set the value of the variable (and to create it if it does not yet exist).
+
+### Question 1
+
+Implement the `set!` keyword with a structure called `set_t`.
+
+🎉 **Congratulations! You were able to implement a basic but working abstract syntax tree interpreter!**
+
+At this step, you probably understand how you can easily add new keywords. For that, you have to create a new structure that inherits from `keyword_t` and to define a new `node_t* apply(frame_t* frame, list_t* list)` method. For example, if we supposed an inequality test operator implemented (i.e., a `<` keyword), implementing a loop to evaluate an expression such as `(while (< i 0) (set! i (+ i 1)))` is as simple as:
+
+```cpp
+node_t* apply(frame_t* frame, list_t* list) {
+  node_t* res = 0;
+
+  while(list->at(1)->eval(frame)->int_value() != 0)
+    for(size_t i=2; i<list->size(); i++)
+      res = list->at(i)->eval(frame);
+
+  return res;
+}
+```
+
+---
+
+## Non mandatory part
+
+For the students interested by the subject, you can continue the exercise to see how you complete the runtime for our lisp language. This part is not graded and is not mandatory. It is only here if you are curious. Implementing the whole interpreter does not require many lines of code: the code of the complete runtime is roughly 400 lines long.
+
+## Lexer and parser
+
+Manually building the abstract syntax trees as we have done in the first part is long and boring. For this reason, before implementing new interesting keywords, we will need a front-end for our language runtime. The front-end takes as entry a source code and uses it to build the abstract syntax tree.
+
+Traditionally a language front-end is built in two parts: a lexer and a parser. A lexer is in charge of identifying the words of the language, which are usually called the `token`. For example, with a sentence like `(+ (+ var 12) 42)`, the lexer will generate this stream of tokens: `(`, `+`, `(`, `+`, `var`, `12`, `)`, `42` and `)`. In this stream, `(`, `+`, `var`, `)` are symbols, while `12` and `14` are integers. In a most language, the lexer directly generates keyword nodes for the keywords and symbols for the symbols, but in lisp, it is much easier to only consider symbols at this step.
+
+The parser consumes the stream of tokens. It is in charge of building the abstract syntax tree.
+
+### Question 1
+
+We will start by implementing the lexer. For that, you have to define a `lexer_t` structure. This structure has two parameters:
+
+* `std::istream* is` is an input stream. This class has one useful method in the exercise: the `int get()` method, which reads a character from the stream.
+* `int next` gives the next character. Keeping this character is required because, sometimes, two tokens are not separated by a space. For example, when the lexer analyzes `12)` it finds the end of the integer `12` by reading the character `)`. At this step, the lexer returns the `integer_t` 12. Since `)` is already consumed from the input stream, we have to keep it somewhere: this is the goal of the `next` field.
+
+Implement a first version of the `lexer_t` structure with these two fields. Add a constructor that initializes `is` from a parameter, and `next` to `' '`. Considering that the next character is `' '` is correct since the lexer ignores them. In main, create a lexer with the expression `lexer_t lexer(&std::cin)`. The `std::cin` object is the standard input stream and reads the characters from the terminal.
+
+### Question 2
+
+Add a method `node_t* next_token()` in `lexer_t`. The method has first to ignore the spaces. In details, while next is a space, you have to read a new character and to store it in `next`. In order to know if a character is a space, you can use `std::isspace(int c)`, which return true if the character is a space (i.e., ' ', '\n', a tabulation etc.).
+
+Then, depending on the first character that is not a space, we have several choices:
+
+* If `next` is equal to EOF, which represents the end of a file, it's an error: the stream is not supposed to end abruptly.
+* If `next` is equal to a parenthesis, we have to allocate a symbol initialized with the character, to call `is->get()` to prepare the next character for the next token, and to return the symbol.
+* Otherwise, it means that the character starts either an integer or a symbol. In order to handle both cases, you need three local variables:
+  * `uintptr_t number = 0` gives the value of the number if it happens that we are reading a number,
+  * `std::string str = ""` gives the value of the symbol if it happens that we are reading a string,
+  * `bool is_number = true` indicates whether we are reading an integer or string. Initially, we consider that we are reading an integer, and if we read a character that is not an integer, we will switch this boolean to false.
+  
+  After having initialized the three variables, you need an infinite loop. This loop:
+  * sets `is_number` to false if `next` is not a number, i.e., if `next` is strictly lower than the character '0' or if `next` is strictly higher than `'9'`.
+  * updates `number` by multiplying it by 10, and by adding `(next - '0')` to it since `(next - '0')` gives the integer associated to the character,
+  * appends `next` to `str` by using the `+=` operator,
+  * reads the next character and stores it in `next`,
+  * at this step, if the new next is a space or a parenthesis, it means that we have our token. We can just return it: an integer initialized with `number` if `is_number` is true, or a symbol initialized with `str` otherwise.
+
+In main, add an infinite loop that reads tokens, and then prints them by using the `to_string()` method. Test that your code is correct with different expressions such as `(+ (+ var 12) 42)`. Your program should print the different tokens, i.e., `(`, `+`, `(`, `+`, `var`, `12`, `)`, `42` and `)`.
 
 > **Note:**  
-> The latitude and longitude are given in radians and not in degrees. This will simplify the code that computes the distance between two cities.
-
-### Question 2
-
-Add a method `void set_neighbors(location_t* list[])` to the structure `location_t`. This function takes as argument an array of cities that ends with a null pointer (`nullptr` in C++). Write the implementation of `set_neighbors` in `location.cpp`. This function has to:
-
-* set the value of the field neighbors to list,
-* and compute the `nb_neighbors` field of `location_t` by finding the `nullptr` in `list`.
-
-In the main function, create the neighbors of our cities by copying the following code:
-
-```cpp
-  palaiseau.set_neighbors(new location_t*[] { &paris, nullptr });
-  paris.set_neighbors(new location_t*[] { &palaiseau, &lemans, &orleans, &reims, &dijon, nullptr });
-  reims.set_neighbors(new location_t*[] { &strasbourg, &dijon, nullptr });
-  strasbourg.set_neighbors(new location_t*[] { &reims, &dijon, nullptr });
-  dijon.set_neighbors(new location_t*[] { &reims, &paris, &bourges, nullptr });
-  lemans.set_neighbors(new location_t*[] { &orleans, &tours, &angers, nullptr });
-  orleans.set_neighbors(new location_t*[] { &lemans, &paris, &bourges, &tours, nullptr });
-  angers.set_neighbors(new location_t*[] { &lemans, &tours, &poitiers, nullptr });
-  tours.set_neighbors(new location_t*[] { &angers, &lemans, &orleans, &bourges, &poitiers, nullptr });
-  bourges.set_neighbors(new location_t*[] { &limoges, &tours, &orleans, nullptr });
-  poitiers.set_neighbors(new location_t*[] { &limoges, &angouleme, nullptr });
-  limoges.set_neighbors(new location_t*[] { &agen, &angouleme, &poitiers, nullptr });
-  angouleme.set_neighbors(new location_t*[] { &poitiers, &limoges, &agen, &bordeaux, nullptr });
-  bordeaux.set_neighbors(new location_t*[] { &angouleme, &agen, &bayonne, nullptr });
-  agen.set_neighbors(new location_t*[] { &toulouse, &pau, &bordeaux, &angouleme, &limoges, nullptr });
-  toulouse.set_neighbors(new location_t*[] { &agen, &pau, nullptr });
-  bayonne.set_neighbors(new location_t*[] { &bordeaux, &pau, &sansebastian, nullptr });
-  pau.set_neighbors(new location_t*[] { &pampelune, &bayonne, &agen, &toulouse, nullptr });
-  sansebastian.set_neighbors(new location_t*[] { &bayonne, &pampelune, &bilbao, nullptr });
-  pampelune.set_neighbors(new location_t*[] { &bilbao, &sansebastian, &pau, nullptr });
-  bilbao.set_neighbors(new location_t*[] { &sansebastian, &pampelune, nullptr });
-```
+> To quit your program, you have to type Control + c
 
 ### Question 3
 
-As you can see in the code that we provide, the array of neighbors is allocated with `new`, but is never freed after. In order to avoid this memory leak, add a destructor to the structure `location_t`. The destructor is in charge of deleting the `neighbors` array (i.e., the array that is allocated with `new` in `main`). Since `neighbors` is an array, you have to delete it with `delete[] neighbors`.
+We can now implement our parser, which builds an abstract syntax tree by consuming the token generated by the lexer. For that, implement a method `node_t* parser(lexer_t* lexer)`. The parser is surprisingly simple if we implement it recursively. In details, the parser reads a token, and if the token is not the `"("` symbol, it returns it (recall that you have a `bool is(std::string id)` to know if a node is the symbol `"("`). Otherwise, i.e., if the token is an opening parenthesis, the `parser` function creates a list, and call recursively `parser` in a loop that ends when the token is the symbol `")"`. At each step of the loop, the `parser` function simply appends the node returned by the recursive call to the list.
+
+In main, in the infinite loop, instead of using the lexer, print the abstract syntax tree returned by the parser.
 
 ### Question 4
 
-Add a function `double distance_to(location_t* to)` to the structure `location_t`. This function returns the distance in kilometers between the city `this` (i.e., the receiver of the call) and the city `to`. The formula that computes this distance is:
+We can now evaluate our abstract syntax trees and print the result in the infinite loop. For that, you have to create a frame before the infinite loop, and to fill it with our two keywords since the abstract syntax tree does not contains the keywords, but the symbols that represent the keyword. For example, to resolve the symbol `+` to the keyword `add_t`, you simply have to write `frame->set(new symbol_t { "+" }, new add_t)`. If your code is correct, you can already performed addition and use variables. Impressive, isn't it?
 
-```cpp
-R * (std::numbers::pi/2 - std::asin(std::sin(lat2) * std::sin(lat1) + std::cos(long2 - long1) * std::cos(lat2) * std::cos(lat1)));
-```
-
-In this formula, R is the radius of the Earth (6378 km). To use `std::numbers::pi`, you have to include `numbers`, and to use the trigonometric functions, you have to include `cmath`.
-
-Verify that your function is correct by computing the distance between Palaiseau and Paris. If this distance is equal to 18.816 km, it means that your code is correct, congratulations!
-
-## A* algorithm
-
-You will now implement the A* algorithm. The A* algorithm computes a path from a location `from` to a location `to`, while trying to minimize the distance.
-
-Our implementation of the A* algorithm is not optimized. It considers an unordered set of nodes, in which each node represents a city. A node gives the minimal distance to the origin (`from`) and the total distance to reach the destination if a virtual direct road from the city to the destination (`to`) would have existed (distance as the crow flies). A node also memorizes the previous city that we used to reach it, which will be used at the end of the algorithm to display the path. In the exercise, the set of nodes is represented as a linked list, which means that each node has also a pointer the a next node. As a result, a node has the following fields:
-
-* `node_t* next`: the next node in the unordered set.
-* `location_t* location`: the city represented by the node.
-* `node_t* from`: the node that represents the city that was used to find the shortest path to reach `location`.
-* `double from_origin`: the distance from the origin when we arrive to `location` from `from`.
-* `double total`: the total distance to reach the destination if a direct path from `location` to the destination would have existed.
-* `bool visited`: a boolean that indicates if we have already visited the city (see below).
-
-> **Tips:**  
-> In detail, the A* algorithm works as follow:
-> * Initially, the set only contains the origin.
-> * At each step, the algorithm finds the node `base`, which is the non visited node that minimizes the distance to reach the destination. In other words, `base` is the non visited node with the smallest `total` field.
-> * If `base` represents the destination, the algorithm found a path and thus stops.
-> * If such a `base` does not exist (i.e., all the nodes are visited), it means that we visited all the cities reachable from the origin without having found a path that reaches the destination. The algorithm thus also stops since we cannot reach the destination from the origin.
-> * If `base` exists and does not represent the destination, the algorithm marks `base` has visited, which avoids restarting from `base` later.
-> * The algorithm then explores the possible paths that start from `base`. For each neighbor `cur` of `base`:
->   * The algorithm computes `from_origin`, which is the distance to reach `cur` when we arrive from `base`. `from_origin` is thus equal to `base->from_origin` plus the distance between `base` and `cur`.
->   * The algorithm computes `total`, which is the distance to reach the destination when we arrive from `base` if a direct road from `cur` to the destination would have existed. `total` is thus equal to `from_origin` plus the distance between `cur` and the destination.
->   * The algorithm then inspects the set of nodes to find if `cur` was already reached through another path. Here, we have two possibilities:
->     * `cur` is not in the set. In this case, you have to create a new `node` `n` to represent `cur`. The `from` field of `n` is `base` since we arrive to `cur` from `base`. The `from_origin` and `total` fields of `n` are the ones we just computed. `n` is not yet visited.
->     * `cur` is already in the set. We have again two possibilities.
->       * The distance between the origin and `cur` that was computed previously is lower than the `from_origin` distance computed when we reach `cur` from `base`. In this case, we don't have anything to do: we already found a better path to reach `cur`.
->       * If this is not the case, we have to update the node: its `from`, `from_origin` and `total` fields. The node was also maybe already previously visited. We have thus to mark the node as non visited again in order to recompute the distance to reach its neighbors.
-> * The algorithm has finally to continue with the next `base`.
+## Exception and error handling
 
 ### Question 1
 
-In a file `shortest_path.h`, give the definition of the structure node. Give also the definition of a structure `shortest_path_t`, which will be used to compute the shortest path from an origin to a destination. This structure has the following fields:
-
-* `node_t* head`: the set of nodes (a pointer to the first node of the set),
-* `node_t* base`: the current base,
-* `location_t* from`: the origin,
-* `location_t* to`: the destination.
-
-The `shortest_path_t` structure also has the following methods:
-
-* A constructor that takes `from` and `to` as arguments and initializes the fields,
-* `void compute()`: computes the shortest path from `from` to `to`,
-* `void display()`: displays this path if it was found.
+Terminating our program when the user enter an invalid an expression is not user-friendly. Instead of quitting, we will rely on what is called an exception. Without giving the details, in `error`, replace all the code by the expression `throw str;`. This expression throws an exception, which means that it inspects the frames of the callers one by one, up to reaching a point where the exception is catched. In the infinite loop in `main`, surround the code by `try { old code here } catch(std::string str) { std::cout << "Error: " << str << std::endl; }`. You can test that now, when an error occurs (e.g., because you try to execute `(1 2)`), your program restarts its execution in the main loop.
 
 ### Question 2
 
-Give the implementation of `node_t` and `shortest_path_t` in a file `shortest_path.cpp`. If you try to find a path from Palaiseau to Bilbao, your program should outputs this path:
+Before going further, we need some keywords. Implement the following keywords:
 
-```text
-path from Palaiseau to Bilbao
-  * Palaiseau at 0 km from Palaiseau
-  * Paris at 18.816 km from Palaiseau
-  * Orléans at 129.914 km from Palaiseau
-  * Tours at 237.795 km from Palaiseau
-  * Poitiers at 332.101 km from Palaiseau
-  * Angouleme at 436.802 km from Palaiseau
-  * Bordeaux at 543.87 km from Palaiseau
-  * Bayonne at 709.778 km from Palaiseau
-  * San Sebastian at 755.108 km from Palaiseau
-  * Bilbao at 832.632 km from Palaiseau
+* `-` such as in `(- x)` or `(- x 2)`: inverts the parameter if the list has a single parameter, computes a subtraction otherwise.
+* `=`, `<` etc. such as in `(< x 10)`: compares two nodes, by supposing that they are integer,
+* `if` such as in `(if (= x 10) 0)` or `(if (= x 10) 0 1)`: implements a conditional. If the conditional is false and if the list has only two elements, you can return the integer 0.
+* `begin` such as `(begin (set! x 1) (set! y 2))`: groups together a set of expression. In details, it executes the expression one after the other and returns the last.
+
+At this step, you should be able to execute a complex code such as:
+
+```lisp
+(while (< x 10)
+  (if (= x 2)
+      (begin
+        (set! y 42)
+        (set! z 100))))
 ```
 
-If you try to come back from Bilbao, there is a missing road on the way back, and you are thus definitely stuck at Bilbao. For this reason, if you try to find a path from Bilbao to Palaiseau, you program should output:
+## Lambda expression
 
-```text
-unable to find a path from Bilbao to Palaiseau
+We will now implement the functions and the function calls. For that we will use what we call a lambda expression. A lambda expression is a list that starts by the keyword `lambda`. Additionally to the keyword, a lambda expression contains two other elements: a list of parameters and a body. For example `(lambda(x) (+ x 1))` represents a function with a single parameter named `x`, and that returns the value `(+ x 1)`.
+
+When we evaluate a lambda expression, we cannot yet call the function: technically, when we evaluate `(lambda(x) (+ x 1))`, we don't know yet what `x` will be. For this reason, the `node_t* eval(frame_t* frame)` function of a lambda expression returns the lambda expression. Like that, we can, for example, save a lambda expression in a symbol, like in `(set! f (lambda(x) (+ x 1)))`. If you evaluate `f` in this case, your program will thus also print the lambda expression.
+
+In order to call a lambda expression, we have to use it, for example with `(f 2)`, which calls the lambda expression with the parameter 2. Since the evaluation of `f` returns the lambda expression, the interpreter will call the `apply` method of `(lambda(x) (+ x 1))` with the initial list as parameter, i.e., `(f 2)`. Since `(lambda(x) (+ x 1))` is a list, it is the `apply` method of `list_t` that is called. A `list_t` is thus the interpreter of a lambda expression. The `node_t* apply(frame_t* frame, list_t* list)` methods of `list_t` has to:
+
+* Create a new frame `new_frame` to store the local variables of the function that will be called,
+* Create the parameters in `new_frame`. For that, `apply` has to iterate over the elements of the second element of `this` (`this->at(1)`, `this->at(1)` etc.), and for each symbol, it has to set the symbol to the evaluation of the argument (i.e., `list->at(1)->eval(frame)`, `list->at(2)->eval(frame)` etc.).
+* Start the execution of the body, technically by evaluating it with the new frame (`this->at(2)->eval(new_frame)`).
+
+### Question 1
+
+With the algorithm described above, `new_frame` only contains the local variable, but not the keywords, which are defined in the root frame created in the `main` function. In order to retrieve them, we will link the frame of a callee to the frame of its caller. Technically, it means that you have to add a `frame_t* parent` field in `frame_t`, and to initialize it through a constructor. For the root frame, i.e., the initial frame created in main, the parent has to be set to `nullptr`.
+
+Additionally to adding a parent field, modify the method `get` to try to find a symbol in the parent's frame if the variable is not defined in the frame.
+
+### Question 2
+
+Add the lambda keyword. The `apply` method of the lambda keyword simply returns the list parameter without evaluating it. Try to execute:
+
+```lisp
+(set! f (lambda(x) (+ x 1)))
+f
 ```
+
+If your program is correct, the interpreter should just print the lambda expression.
 
 ### Question 3
 
-In `shortest_path_t`, add a destructor in charge of deleting the nodes that were allocated in the `compute` method.
+Add the `eval` method in `list_t`. The method is in charge of invoking the lambda expression as described above.
 
-### Question 4
+🎉 **Congratulations! You made it, you wrote your first language runtime for a lisp language!**
 
-Submit your work. For that, start by running `git status` to identify the untracked files and to add them to the repository with `git add`. Then, commit your code (`git commit`) and push the commit to the gitlab repository (`git push`).
+## Making all that magic
 
-🎉 **You are now able to develop complex applications in C++, congratulations!**
+Our language runtime cannot communicate with the user yet. For that, you have to access C functions such as `printf`, which rely on the operating system to communicate with the user. These functions are said to be foreign functions, since they are not defined in the target language (i.e., lisp in our case). In order to invoke a foreign function, we need a wrapper. For that, we could define our wrappers as keywords, which would solve the problem. However, writing these keywords will become quite repetitive. For this reason, we will use a more generic solution, which consists in generating on demand the wrappers to invoke the foreign functions.
 
-If you want to test more paths, here are some outputs that you can generate. Note that many roads are missing when you go from the south to the north.
+To generate on demand these wrappers, we will rely on a function provides by the `C` library called `dlsym(void* handle, const char* name)`. `dlsym` looks up, in the binary file or shared library represented by `handle`, the value associated to the symbol named `name`. This is similar to what you have done with the `get` method of `frame_t`, which looks up a value associated to a symbol name. In our case, `dlsym` becomes interesting with the predefined `RTLD_DEFAULT` library, which represents our own binary. With that, we can extract the address of a symbol inside our own binary. For example, to extract the address of `printf`, you can write `dlsym(RTLD_DEFAULT, "printf")`.
 
-```text
-path from Strasbourg to Bordeaux
-  * Strasbourg at 0 km from Strasbourg
-  * Dijon at 187.115 km from Strasbourg
-  * Bourges at 384.641 km from Strasbourg
-  * Limoges at 548.625 km from Strasbourg
-  * Angouleme at 636.903 km from Strasbourg
-  * Bordeaux at 743.971 km from Strasbourg
-path from Tours to Reims
-  * Tours at 0 km from Tours
-  * Orléans at 107.881 km from Tours
-  * Paris at 218.979 km from Tours
-  * Reims at 340.54 km from Tours
-unable to find a path from Bilbao to Palaiseau
+> **Note:**
+> If you want to see all the symbols of your binary, you can use the command `nm`. The C symbols are encoded as they written, but the C++ symbols are encoded in a strange way with their types. To see the corresponding symbols, you can chain `nm` with `c++filt`. For example, the following command prints all the C++ symbols with their associated encoded names:
+>
+> ```bash
+> nm -j ./ast | while read s; do printf "%-60s => %s\n" "$(c++filt $s)" "$s"; done
+> ```
+>
+> If you're looking for a specific symbol, you can chain the result of the previous command with `grep`. For example, to see all symbols of the `list_t` structure, you can use
+>
+> ```bash
+> nm -j ./ast | while read s; do printf "%-60s => %s\n" "$(c++filt $s)" "$s"; done | grep 'list_t::'
+> ```
+
+### Question 1
+
+In order to extract a symbol of our library, we need strings. Implement a `string_t` structure that inherits `node_t`. A `string_t` has a single field with the type `std::string` that represents the string, and its `std::string to_string()` method simply returns it.
+
+Modify the lexer to be able to parse a string. For that, if the token starts by `"`, you have to accumulate the characters in the `str` local variable, and to return the string when you find the ending `"` (don't forget to call `is->get()` before returning to prepare the next token). While you process an integer or a symbol, you also have to stop when you find a `"`, since this symbol indicates that you are starting a string. Check that you are now able to parse string by typing `"hello"` in the interpreter. If your code is correct, your interpreter should output `hello`.
+
+### Question 2
+
+We can now create our foreign function interface (FFI). For that, we use a trick: we consider that if a list starts with an integer, then the integer is the address of a function. For this reason, the `void apply(frame_t* frame, list_t* list)` will act as our foreign function interface. Since writing the code to indirectly call a function through a pointer in a generic way is difficult, we provide the code of this `apply` method:
+
+```cpp
+node_t* integer_t::apply(frame_t* frame, list_t* list) {
+  uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t, uintptr_t) = (uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t))int_value();
+  uintptr_t (*g)(uintptr_t, ...) = (uintptr_t (*)(uintptr_t, ...))int_value();
+  std::string strs[4];
+  uintptr_t args[] = { 0, 0, 0, 0 };
+  size_t n = list->size() < 5 ? list->size() : 5;
+
+  for(size_t i=1; i<n; i++) {
+    node_t* arg = list->at(i)->eval(frame);
+    std::cout << "str: '" << arg->to_string() << "'" << std::endl;
+    args[i-1] = arg->is_integer() ? arg->int_value() : (uintptr_t)(strs[i-1] = arg->to_string()).c_str();
+  }
+
+  if((uintptr_t)f == (uintptr_t)printf || (uintptr_t)f == (uintptr_t)vprintf || (uintptr_t)f == (uintptr_t)snprintf)
+    return new integer_t { g(args[0], args[1], args[2], args[3]) };
+  else
+    return new integer_t { f(args[0], args[1], args[2], args[3]) };
+}
 ```
+
+To understand the code, `f` is a pointer to a function with 4 arguments (the maximum number of arguments that we handle), while `g` is a pointer to a function with a variadic number of arguments. `f` and `g` are initialized with the `int_value()` of the integer, which is supposed to be a function pointer. The loop is in charge of extracting the arguments and of preparing them for the foreign call. To differentiate an integer and a string, the code uses `is_integer()` that you have to implement. The last line uses `g` for the common variadic calls (e.g., the `printf` functions family), and `f` otherwise.
+
+> **Note:**
+> To make the code run, you have to implement an `is_integer()` that returns false for all the node types but `integer_t`.
+
+### Question 3
+
+Now that we have a foreign function interface, we can expose the `dlsym` function and the `RTLD_DEFAULT` handle in the language with:
+
+```cpp
+frame->set(new symbol_t { "dlsym" }, new integer_t { (uintptr_t)dlsym });
+frame->set(new symbol_t { "dlself" }, new integer_t { (uintptr_t)RTLD_DEFAULT });
+```
+
+If everything works well, you can use `dlsym` to create on demand new foreign functions interface. If your code is correct, you should be able to execute this program:
+
+```lisp
+(begin
+  (set! printf (dlsym dlself "printf"))
+  (set! exit (dlsym dlself "exit"))
+  (printf "\n=== welcome ===\n")
+  (set! f (lambda(x)
+            (begin
+              (set! i 0)
+              (while (< i x)
+                     (begin
+                       (printf "i: %d\n" i)
+                       (set! i (+ i 1)))))))
+  (set! g (lambda(x) (f (+ x 2))))
+  (g 3)
+  (exit 42))
+```
+
+---
+
+🎉 **Congratulation, you have a basic complete language runtime. The runtime is not perfect and can be extended, but adding new features now is only a matter of engineering: all the basics elements of any language runtime are present.**
+
+
+
